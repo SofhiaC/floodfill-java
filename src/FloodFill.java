@@ -1,76 +1,88 @@
+import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import javax.imageio.ImageIO;
 
 public class FloodFill {
 
-    public static void floodFillDFS(BufferedImage img, int startX, int startY, int newColor, int sleepMillis, ImagePanel panel) {
-        int w = img.getWidth(), h = img.getHeight();
-        if (!inBounds(startX, startY, w, h)) return;
-        int background = img.getRGB(startX, startY);
-        if (background == newColor) return;
+    private final BufferedImage image;
+    private final int width, height;
+    private int frameCount = 0;
+    private int pixelCounter = 0;
+    private final boolean useStack;
 
-        boolean[][] visited = new boolean[h][w];
-        ArrayStack<Pixel> stack = new ArrayStack<>();
-        stack.push(new Pixel(startX, startY));
-        visited[startY][startX] = true;
+    public FloodFill(BufferedImage image, boolean useStack) {
+        this.image = image;
+        this.width = image.getWidth();
+        this.height = image.getHeight();
+        this.useStack = useStack;
 
-        int[][] dirs = {{0,-1},{0,1},{-1,0},{1,0}};
-
-        while (!stack.isEmpty()) {
-            Pixel p = stack.pop();
-            int x = p.x, y = p.y;
-            if (!inBounds(x,y,w,h)) continue;
-            if (img.getRGB(x,y) != background) continue;
-            img.setRGB(x,y,newColor);
-            panel.repaint();
-            try { Thread.sleep(sleepMillis); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-
-            for (int[] d : dirs) {
-                int nx = x + d[0], ny = y + d[1];
-                if (inBounds(nx,ny,w,h) && !visited[ny][nx]) {
-                    if (img.getRGB(nx,ny) == background) {
-                        stack.push(new Pixel(nx,ny));
-                        visited[ny][nx] = true;
-                    }
-                }
-            }
+        // cria a pasta Images se não existir
+        File dir = new File("Images");
+        if (!dir.exists()) {
+            dir.mkdir();
         }
     }
 
-    public static void floodFillBFS(BufferedImage img, int startX, int startY, int newColor, int sleepMillis, ImagePanel panel) {
-        int w = img.getWidth(), h = img.getHeight();
-        if (!inBounds(startX, startY, w, h)) return;
-        int background = img.getRGB(startX, startY);
-        if (background == newColor) return;
+    public void fill(int startX, int startY, Color newColor, FloodFillApp app) {
+        int targetColor = image.getRGB(startX, startY);
+        if (targetColor == newColor.getRGB()) return;
 
-        boolean[][] visited = new boolean[h][w];
-        ArrayQueue<Pixel> queue = new ArrayQueue<>();
-        queue.enqueue(new Pixel(startX, startY));
-        visited[startY][startX] = true;
+        FloodFillApp.Stack<Point> stack = new FloodFillApp.ArrayStack<>(1000);
+        FloodFillApp.Queue<Point> queue = new FloodFillApp.ArrayQueue<>(1000);
 
-        int[][] dirs = {{0,-1},{0,1},{-1,0},{1,0}};
+        if (useStack) {
+            stack.push(new Point(startX, startY));
+        } else {
+            queue.enqueue(new Point(startX, startY));
+        }
 
-        while (!queue.isEmpty()) {
-            Pixel p = queue.dequeue();
-            int x = p.x, y = p.y;
-            if (!inBounds(x,y,w,h)) continue;
-            if (img.getRGB(x,y) != background) continue;
-            img.setRGB(x,y,newColor);
-            panel.repaint();
-            try { Thread.sleep(sleepMillis); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        while ((useStack && !stack.isEmpty()) || (!useStack && !queue.isEmpty())) {
+            Point p = useStack ? stack.pop() : queue.dequeue();
+            int x = p.x;
+            int y = p.y;
 
-            for (int[] d : dirs) {
-                int nx = x + d[0], ny = y + d[1];
-                if (inBounds(nx,ny,w,h) && !visited[ny][nx]) {
-                    if (img.getRGB(nx,ny) == background) {
-                        queue.enqueue(new Pixel(nx,ny));
-                        visited[ny][nx] = true;
-                    }
-                }
+            if (x < 0 || x >= width || y < 0 || y >= height) continue;
+            if (image.getRGB(x, y) != targetColor) continue;
+
+            image.setRGB(x, y, newColor.getRGB());
+            pixelCounter++;
+
+            // salva imagem a cada 4 pixels
+            if (pixelCounter % 4 == 0) {
+                saveFrame();
+                app.refresh();
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException ignored) {}
+            }
+
+            if (useStack) {
+                stack.push(new Point(x + 1, y));
+                stack.push(new Point(x - 1, y));
+                stack.push(new Point(x, y + 1));
+                stack.push(new Point(x, y - 1));
+            } else {
+                queue.enqueue(new Point(x + 1, y));
+                queue.enqueue(new Point(x - 1, y));
+                queue.enqueue(new Point(x, y + 1));
+                queue.enqueue(new Point(x, y - 1));
             }
         }
+
+        // salva imagem final
+        saveFrame();
+        app.refresh();
     }
 
-    private static boolean inBounds(int x, int y, int w, int h) {
-        return x >= 0 && x < w && y >= 0 && y < h;
+    private void saveFrame() {
+        try {
+            String filename = String.format("Images/frame_%04d.png", frameCount++);
+            ImageIO.write(image, "png", new File(filename));
+            System.out.println("Imagem salva: " + filename);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

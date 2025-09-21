@@ -1,101 +1,153 @@
+import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.IOException;
 import javax.imageio.ImageIO;
-import javax.swing.*;
 
-public class FloodFillApp {
+public class FloodFillApp extends JFrame {
 
-    private JFrame frame;
-    private ImagePanel imagePanel;
     private BufferedImage image;
-    private JButton loadBtn, runBtn;
-    private JRadioButton dfsBtn, bfsBtn;
-    private JLabel infoLabel;
+    private FloodFill floodFill;
+    private int scale = 20; // fator de zoom da imagem
 
-    // Cor e ponto inicial fixos
-    private final Color fillColor = Color.RED;
-    private final Point startPoint = new Point(0, 0);
+    public FloodFillApp(String inputImagePath, boolean useStack) {
+        try {
+            image = ImageIO.read(new File(inputImagePath));
+            floodFill = new FloodFill(image, useStack);
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
 
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new FloodFillApp().createAndShowGui());
-    }
+        setTitle("Flood Fill Animation (" + (useStack ? "Stack/DFS" : "Queue/BFS") + ")");
+        setSize(image.getWidth() * scale, image.getHeight() * scale);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
 
-    private void createAndShowGui() {
-        frame = new JFrame("FloodFill - DFS (pilha) / BFS (fila)");
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(900, 700);
-        frame.setLayout(new BorderLayout());
-
-        imagePanel = new ImagePanel();
-        imagePanel.setPreferredSize(new Dimension(800, 600));
-        frame.add(new JScrollPane(imagePanel), BorderLayout.CENTER);
-
-        JPanel controls = new JPanel();
-        loadBtn = new JButton("Carregar imagem");
-        runBtn = new JButton("Executar floodfill");
-        dfsBtn = new JRadioButton("Pilha (DFS)");
-        bfsBtn = new JRadioButton("Fila (BFS)");
-        ButtonGroup g = new ButtonGroup();
-        g.add(dfsBtn);
-        g.add(bfsBtn);
-        dfsBtn.setSelected(true);
-
-        infoLabel = new JLabel("Ponto fixo: (0,0) | Cor: Vermelho");
-
-        controls.add(loadBtn);
-        controls.add(dfsBtn);
-        controls.add(bfsBtn);
-        controls.add(runBtn);
-        controls.add(infoLabel);
-
-        frame.add(controls, BorderLayout.SOUTH);
-
-        loadBtn.addActionListener(e -> loadImage());
-
-        runBtn.addActionListener(e -> {
-            if (image == null) {
-                JOptionPane.showMessageDialog(frame, "Carregue uma imagem primeiro.");
-                return;
+        add(new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                // desenha a imagem escalada
+                g.drawImage(image, 0, 0, image.getWidth() * scale, image.getHeight() * scale, null);
             }
-            runBtn.setEnabled(false);
-            loadBtn.setEnabled(false);
-            boolean useDFS = dfsBtn.isSelected();
-            new Thread(() -> {
-                try {
-                    if (useDFS) {
-                        FloodFill.floodFillDFS(image, startPoint.x, startPoint.y, fillColor.getRGB(), 20, imagePanel);
-                    } else {
-                        FloodFill.floodFillBFS(image, startPoint.x, startPoint.y, fillColor.getRGB(), 20, imagePanel);
-                    }
-                    JOptionPane.showMessageDialog(frame, "Floodfill concluído.");
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                    JOptionPane.showMessageDialog(frame, "Erro: " + ex.getMessage());
-                } finally {
-                    runBtn.setEnabled(true);
-                    loadBtn.setEnabled(true);
-                }
-            }, "FloodFill-Thread").start();
         });
 
-        frame.setVisible(true);
+        new Thread(() -> {
+            try {
+                floodFill.fill(1, 1, Color.RED, this); // floodfill começa em (1,1)
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
     }
 
-    private void loadImage() {
-        JFileChooser fc = new JFileChooser(".");
-        int res = fc.showOpenDialog(frame);
-        if (res == JFileChooser.APPROVE_OPTION) {
-            try {
-                File f = fc.getSelectedFile();
-                image = ImageIO.read(f);
-                if (image == null) throw new RuntimeException("Formato de imagem não suportado");
-                imagePanel.setImage(image);
-                imagePanel.setCrosshair(startPoint.x, startPoint.y);
-            } catch (Exception ex) {
-                ex.printStackTrace();
-                JOptionPane.showMessageDialog(frame, "Erro ao carregar imagem: " + ex.getMessage());
+    public void refresh() {
+        repaint();
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            // menu para escolher pilha ou fila
+            String[] options = {"Stack (DFS)", "Queue (BFS)"};
+            int choice = JOptionPane.showOptionDialog(null,
+                    "Escolha o modelo de flood fill:",
+                    "Flood Fill",
+                    JOptionPane.DEFAULT_OPTION,
+                    JOptionPane.INFORMATION_MESSAGE,
+                    null, options, options[0]);
+
+            boolean useStack = (choice == 0);
+
+            new FloodFillApp("entrada.png", useStack).setVisible(true);
+        });
+    }
+
+    // ---------------- Interface da Pilha ----------------
+    interface Stack<T> {
+        void push(T item);
+        T pop();
+        boolean isEmpty();
+    }
+
+    // ---------------- Implementação da Pilha ----------------
+    static class ArrayStack<T> implements Stack<T> {
+        private Object[] data;
+        private int top;
+
+        public ArrayStack(int capacity) {
+            data = new Object[capacity];
+            top = -1;
+        }
+
+        public void push(T item) {
+            if (top == data.length - 1) expand();
+            data[++top] = item;
+        }
+
+        public T pop() {
+            if (isEmpty()) return null;
+            return (T) data[top--];
+        }
+
+        public boolean isEmpty() {
+            return top == -1;
+        }
+
+        private void expand() {
+            Object[] newData = new Object[data.length * 2];
+            System.arraycopy(data, 0, newData, 0, data.length);
+            data = newData;
+        }
+    }
+
+    // ---------------- Interface da Fila ----------------
+    interface Queue<T> {
+        void enqueue(T item);
+        T dequeue();
+        boolean isEmpty();
+    }
+
+    // ---------------- Implementação da Fila ----------------
+    static class ArrayQueue<T> implements Queue<T> {
+        private Object[] data;
+        private int front, rear, size;
+
+        public ArrayQueue(int capacity) {
+            data = new Object[capacity];
+            front = 0;
+            rear = -1;
+            size = 0;
+        }
+
+        public void enqueue(T item) {
+            if (size == data.length) expand();
+            rear = (rear + 1) % data.length;
+            data[rear] = item;
+            size++;
+        }
+
+        public T dequeue() {
+            if (isEmpty()) return null;
+            T item = (T) data[front];
+            front = (front + 1) % data.length;
+            size--;
+            return item;
+        }
+
+        public boolean isEmpty() {
+            return size == 0;
+        }
+
+        private void expand() {
+            Object[] newData = new Object[data.length * 2];
+            for (int i = 0; i < size; i++) {
+                newData[i] = data[(front + i) % data.length];
             }
+            front = 0;
+            rear = size - 1;
+            data = newData;
         }
     }
 }
