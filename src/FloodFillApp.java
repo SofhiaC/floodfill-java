@@ -21,7 +21,7 @@ public class FloodFillApp extends JFrame {
         }
 
         setTitle("Flood Fill Animation (" + (useStack ? "Stack/DFS" : "Queue/BFS") + ")");
-        setSize(image.getWidth() * scale, image.getHeight() * scale);
+        setSize(340, 360);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 

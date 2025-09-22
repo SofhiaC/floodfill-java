@@ -46,13 +46,13 @@ public class FloodFill {
             - Stack (DFS) → percorre em profundidade, indo até o fim antes de voltar.
             - Queue (BFS) → percorre em largura, camada por camada.
          */
-        FloodFillApp.Stack<Point> stack = new FloodFillApp.ArrayStack<>(1000);
-        FloodFillApp.Queue<Point> queue = new FloodFillApp.ArrayQueue<>(1000);
+        FloodFillApp.Stack<Pixel> stack = new FloodFillApp.ArrayStack<>(1000);
+        FloodFillApp.Queue<Pixel> queue = new FloodFillApp.ArrayQueue<>(1000);
 
         if (useStack) {
-            stack.push(new Point(startX, startY));
+            stack.push(new Pixel(startX, startY));
         } else {
-            queue.enqueue(new Point(startX, startY));
+            queue.enqueue(new Pixel(startX, startY));
         }
 
 
@@ -65,7 +65,7 @@ public class FloodFill {
             - Caso positivo, pinta o pixel com a nova cor e aumenta o contador.
          */
         while ((useStack && !stack.isEmpty()) || (!useStack && !queue.isEmpty())) {
-            Point p = useStack ? stack.pop() : queue.dequeue();
+            Pixel p = useStack ? stack.pop() : queue.dequeue();
             int x = p.x;
             int y = p.y;
 
@@ -91,15 +91,15 @@ public class FloodFill {
                 - Isso garante que todo o "território conectado" seja preenchido.
              */
             if (useStack) {
-                stack.push(new Point(x + 1, y));
-                stack.push(new Point(x - 1, y));
-                stack.push(new Point(x, y + 1));
-                stack.push(new Point(x, y - 1));
+                stack.push(new Pixel(x + 1, y));
+                stack.push(new Pixel(x - 1, y));
+                stack.push(new Pixel(x, y + 1));
+                stack.push(new Pixel(x, y - 1));
             } else {
-                queue.enqueue(new Point(x + 1, y));
-                queue.enqueue(new Point(x - 1, y));
-                queue.enqueue(new Point(x, y + 1));
-                queue.enqueue(new Point(x, y - 1));
+                queue.enqueue(new Pixel(x + 1, y));
+                queue.enqueue(new Pixel(x - 1, y));
+                queue.enqueue(new Pixel(x, y + 1));
+                queue.enqueue(new Pixel(x, y - 1));
             }
         }
 
